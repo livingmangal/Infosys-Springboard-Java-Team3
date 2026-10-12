@@ -1,4 +1,14 @@
-mermaid'''
+# 🛡️ SecureVault — Database Schema & Architecture
+
+> **Infosys Springboard Java Project — Team 3**  
+> Integrated Password Vault & Secure Credential Sharing Management System  
+> **Database:** PostgreSQL 16 | **Key Type:** UUID (`gen_random_uuid()`) | **Cache:** Redis 7
+
+---
+
+## 📊 Entity Relationship Diagram (ERD)
+
+```mermaid
 erDiagram
     %% ==========================================
     %% 1. USER AUTHENTICATION & ACCESS CONTROL
@@ -16,7 +26,7 @@ erDiagram
         string password_hash "NOT NULL"
         string vault_key_salt "NOT NULL"
         boolean mfa_enabled "NOT NULL DEFAULT false"
-        string mfa_secret "NULLABLE (encrypted)"
+        string mfa_secret "ENCRYPTED NULLABLE"
         string oauth2_provider "NULLABLE"
         string reset_password_token "NULLABLE"
         datetime reset_token_expires_at "NULLABLE"
@@ -76,7 +86,7 @@ erDiagram
         UUID id PK
         UUID owner_id FK "NOT NULL"
         string vault_name "NOT NULL"
-        string vault_type "NOT NULL DEFAULT 'PERSONAL'"
+        string vault_type "NOT NULL DEFAULT PERSONAL"
         datetime created_at "NOT NULL"
         datetime updated_at "NOT NULL"
     }
@@ -84,7 +94,7 @@ erDiagram
     VAULT_MEMBERS {
         UUID vault_id PK, FK
         UUID user_id PK, FK
-        string role "NOT NULL"
+        string role "NOT NULL DEFAULT MEMBER"
         datetime joined_at "NOT NULL"
     }
 
@@ -152,7 +162,7 @@ erDiagram
         UUID shared_by_user_id FK "NOT NULL"
         UUID shared_with_user_id FK "NOT NULL"
         string permission_level "NOT NULL"
-        string status "NOT NULL DEFAULT 'ACTIVE'"
+        string status "NOT NULL DEFAULT ACTIVE"
         datetime expires_at "NULLABLE"
         datetime created_at "NOT NULL"
     }
@@ -177,7 +187,7 @@ erDiagram
         UUID id PK
         UUID user_id FK "NULLABLE"
         string event_type "NOT NULL"
-        string severity "NOT NULL DEFAULT 'MEDIUM'"
+        string severity "NOT NULL DEFAULT MEDIUM"
         int risk_score "NOT NULL"
         boolean anomaly_detected "NOT NULL"
         boolean is_resolved "NOT NULL DEFAULT false"
@@ -222,3 +232,36 @@ erDiagram
         int failed_logins "NOT NULL DEFAULT 0"
         int mfa_successes "NOT NULL DEFAULT 0"
     }
+```
+
+---
+
+## 📁 Modules Breakdown
+
+### 1. User Authentication & Access Control
+* **`users`**: Core user entity storing authentication hashes, salt for PBKDF2/Argon2 vault key derivation, MFA TOTP secrets, reset tokens, and account lockout tracking.
+* **`roles` & `user_roles`**: Many-to-many RBAC model (`ROLE_USER`, `ROLE_TEAM_MEMBER`, `ROLE_ADMIN`).
+* **`sessions`**: Active JWT/session tokens with IP, user-agent, expiry, and revocation tracking.
+* **`devices`**: Device fingerprints for unfamiliar login detection and MFA device trust.
+
+### 2. Password Vault & Credential Storage
+* **`vaults`**: Personal and team vaults owned by users.
+* **`vault_members`**: Membership and role delegation for shared team vaults.
+* **`folders`**: Hierarchical organization inside vaults.
+* **`categories`**: Default classifications (Website Login, Email Accounts, Banking Credentials, API Keys, etc.).
+* **`credentials`**: Encrypted payload storage with AES-256-GCM metadata (`encryption_iv`, `key_version`), search titles, and strength scores.
+* **`tags` & `tag_mappings`**: Flexible tagging system for credentials.
+* **`attachments`**: Secure file attachments referencing encrypted S3 object paths.
+
+### 3. Secure Sharing
+* **`sharing`**: Granular credential sharing between users with permission levels (`VIEW`, `EDIT`, `FULL_MANAGEMENT`), status tracking (`ACTIVE`, `REVOKED`, `EXPIRED`), and expiration timestamps.
+
+### 4. Security Monitoring, Audit Logging & Alerts
+* **`audit_logs`**: Immutable audit trail for every user action, status (`SUCCESS`/`FAILURE`), IP address, and payload details.
+* **`security_events`**: Anomaly and threat tracking with risk scores (`0-100`) and severity levels (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`).
+* **`blocked_ips`**: IP throttling and brute-force blocklist.
+* **`notifications`**: User alert queue for login notifications, security warnings, and share invites.
+
+### 5. Analytics Dashboard
+* **`password_health`**: Aggregated security score per user, counting weak, reused, and compromised passwords.
+* **`login_stats`**: Daily metrics tracking total logins, failures, and MFA successes for admin dashboards.
